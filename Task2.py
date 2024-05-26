@@ -1,6 +1,7 @@
 import cv2
 import pytesseract
 import numpy as np
+from PIL import Image, ImageDraw, ImageFont
 
 def get_average_color(image, x, y, w, h):
     """Calculate the average color of a specific region in the image."""
@@ -38,15 +39,33 @@ def annotate_image(image_path):
             cv2.putText(output, info_text, (x, y - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 0, 0), 1)
             cv2.putText(output, text, (x, y + h + 20), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 0), 1)
 
-    return output
+    # Save annotated image
+    annotated_image_path = 'annotated_image_with_ocr.png'
+    cv2.imwrite(annotated_image_path, output)
 
+    # Convert the image to PIL for final overlay
+    pil_image = Image.fromarray(cv2.cvtColor(output, cv2.COLOR_BGR2RGB))
+    draw = ImageDraw.Draw(pil_image)
+    font = ImageFont.load_default()
+
+    # Annotate image with OCR details
+    ocr_result = pytesseract.image_to_data(pil_image, output_type=pytesseract.Output.DICT)
+    for i in range(len(ocr_result['text'])):
+        if ocr_result['text'][i].strip() != '':
+            x, y, w, h = ocr_result['left'][i], ocr_result['top'][i], ocr_result['width'][i], ocr_result['height'][i]
+            text = ocr_result['text'][i]
+            overlay_text = f"{text} ({w}x{h})"
+            draw.text((x, y + h + 5), overlay_text, fill="red", font=font)  # Adjusted position to below the box
+
+    # Save the final image with overlays
+    final_image_path = 'final_annotated_image_with_ocr.png'
+    pil_image.save(final_image_path)
+    pil_image.show()
+
+    return final_image_path
+
+# Ensure pytesseract is correctly configured
 pytesseract.pytesseract.tesseract_cmd = r'C:\Program Files\Tesseract-OCR\tesseract.exe'  # Ensure this is correct
 
 # Process the image and display the result
-processed_image = annotate_image('Excel.jpeg')  # Update this with your image path
-if processed_image is not None:
-    cv2.imshow('Annotated Image', processed_image)
-    cv2.waitKey(0)
-    cv2.destroyAllWindows()
-else:
-    print("Failed to process the image.")
+annotate_image('Excel.jpeg')  # Update this with your image path
